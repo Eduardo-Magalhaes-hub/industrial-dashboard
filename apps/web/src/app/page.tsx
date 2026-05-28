@@ -14,7 +14,14 @@ import { useMachineStatus } from "@/hooks/useMachineStatus";
 import { useAlerts } from "@/hooks/useAlerts";
 import { useMetricHistory } from "@/hooks/useMetricHistory";
 import { formatUptime } from "@/lib/formatters";
+import { DEFAULT_THRESHOLDS } from "@industrial/types";
 import { Thermometer, Gauge, Clock, Activity } from "lucide-react";
+
+// Limites operacionais centralizados em @industrial/types.
+// Os cards usam estes valores para máximo, faixas de aviso e crítico —
+// nenhum número de limite fica hardcoded no componente.
+const TEMP = DEFAULT_THRESHOLDS.temperature;
+const RPM = DEFAULT_THRESHOLDS.rpm;
 
 export default function DashboardPage() {
   const { status, isConnected, isLoading } = useMachineStatus();
@@ -47,9 +54,9 @@ export default function DashboardPage() {
             value={metrics?.temperature ?? 0}
             unit="°C"
             icon={<Thermometer className="w-5 h-5" />}
-            max={95}
-            warningThreshold={80}
-            criticalThreshold={88}
+            max={TEMP.max}
+            warningThreshold={TEMP.warning}
+            criticalThreshold={TEMP.critical}
             isLoading={isLoading}
           />
           <MetricCard
@@ -57,8 +64,8 @@ export default function DashboardPage() {
             value={metrics?.rpm ?? 0}
             unit="RPM"
             icon={<Gauge className="w-5 h-5" />}
-            max={1500}
-            warningThreshold={900}
+            max={RPM.max}
+            warningThreshold={RPM.min}
             isLoading={isLoading}
             invertThreshold // abaixo do warning é ruim
           />

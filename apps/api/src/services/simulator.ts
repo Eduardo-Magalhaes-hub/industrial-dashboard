@@ -5,7 +5,7 @@
  */
 import { v4 as uuid } from "uuid";
 import { getDatabase } from "../database/schema";
-import type { MachineState } from "@industrial/types";
+import { DEFAULT_THRESHOLDS, type MachineState } from "@industrial/types";
 
 let currentState: MachineState = "RUNNING";
 let temperature = 72;
@@ -13,7 +13,10 @@ let rpm = 1200;
 let uptimeSeconds = 0;
 let simulatorInterval: NodeJS.Timeout | null = null;
 
-const THRESHOLDS = { tempWarning: 80, tempCritical: 88, rpmMin: 900 };
+// Limites vêm da fonte única de verdade em @industrial/types,
+// garantindo que simulador e frontend usem exatamente os mesmos valores.
+const TEMP = DEFAULT_THRESHOLDS.temperature;
+const RPM = DEFAULT_THRESHOLDS.rpm;
 
 // Janela de supressão: não recria o mesmo alerta para o mesmo componente
 // dentro deste intervalo (em ms). Evita spam quando a condição persiste por
@@ -36,11 +39,14 @@ export function simulateTick(): void {
     if (rand < 0.08) currentState = "RUNNING";
   }
 
+  // Temperatura tende ao alvo (72°C em operação, 50°C parada) com ruído.
+  // Clamp em [35, 88]: o teto de 88 fica acima do crítico (82) para que
+  // o simulador eventualmente dispare alertas críticos de forma realista.
   const targetTemp = currentState === "RUNNING" ? 72 : 50;
   temperature = temperature + (targetTemp - temperature) * 0.03 + wobble(0, 1.2);
-  temperature = Math.max(35, Math.min(98, temperature));
+  temperature = Math.max(35, Math.min(88, temperature));
 
-  rpm = currentState === "RUNNING" ? wobble(1200, 90) : 0;
+  rpm = currentState === "RUNNING" ? wobble(RPM.nominal, 90) : 0;
   rpm = Math.max(0, rpm);
 
   if (currentState === "RUNNING") uptimeSeconds += 3;
@@ -92,12 +98,13 @@ function checkAndCreateAlerts(timestamp: string): void {
     ).run(uuid(), level, message, component, timestamp);
   };
 
-  if (temperature >= THRESHOLDS.tempCritical)
+  // Limiares de temperatura vindos da fonte única de verdade
+  if (temperature >= TEMP.critical)
     tryCreateAlert("CRITICAL", `Temperatura crítica: ${temperature.toFixed(1)}°C`, "Sensor T-01");
-  else if (temperature >= THRESHOLDS.tempWarning)
+  else if (temperature >= TEMP.warning)
     tryCreateAlert("WARNING", `Temperatura elevada: ${temperature.toFixed(1)}°C`, "Sensor T-01");
 
-  if (currentState === "RUNNING" && rpm < THRESHOLDS.rpmMin)
+  if (currentState === "RUNNING" && rpm < RPM.min)
     tryCreateAlert("WARNING", `RPM abaixo do mínimo: ${rpm.toFixed(0)} RPM`, "Motor M-01");
 
   if (currentState === "ERROR")
@@ -112,7 +119,7 @@ export function getLatestStatus() {
 
 export function startSimulator(): void {
   if (simulatorInterval) return;
-  console.log("Simulador iniciado — atualizando a cada 3 segundos");
+  console.log("🔄 Simulador iniciado — atualizando a cada 3 segundos");
   simulateTick();
   simulatorInterval = setInterval(simulateTick, 3000);
 }

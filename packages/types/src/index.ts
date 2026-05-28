@@ -89,3 +89,26 @@ export interface ApiResponse<T> {
   timestamp: string;
   success: boolean;
 }
+// ============================================================
+// Limites operacionais padrão do misturador (fonte única de verdade)
+// ------------------------------------------------------------
+// Centralizados aqui para que frontend (cards, gráfico) e backend
+// (simulador, geração de alertas) usem EXATAMENTE os mesmos valores.
+// Alterar um limite aqui propaga para todo o sistema automaticamente.
+// ============================================================
+export const DEFAULT_THRESHOLDS: MachineThresholds = {
+  temperature: {
+    warning: 75,   // °C — início da faixa de atenção (amarelo)
+    critical: 82,  // °C — início da faixa crítica (vermelho)
+    max: 85,        // °C — máximo operacional exibido nos cards/gráfico
+  },
+  rpm: {
+    min: 900,       // RPM — abaixo disso em operação gera alerta
+    nominal: 1200,  // RPM — velocidade alvo de trabalho
+    max: 1500,      // RPM — máximo exibido nos cards
+  },
+  efficiency: {
+    warning: 80,   // % — eficiência abaixo disso é preocupante
+    critical: 60,  // % — eficiência crítica
+  },
+};
