@@ -1,6 +1,7 @@
 /**
  * Simulador de tempo real do misturador.
- * Gera um novo ponto de dados a cada 3s e cria alertas automáticos.
+ * Gera um novo ponto de dados a cada 3s e cria alertas automáticos
+ * com deduplicação por componente (suppression window).
  */
 import { v4 as uuid } from "uuid";
 import { getDatabase } from "../database/schema";
@@ -13,6 +14,11 @@ let uptimeSeconds = 0;
 let simulatorInterval: NodeJS.Timeout | null = null;
 
 const THRESHOLDS = { tempWarning: 80, tempCritical: 88, rpmMin: 900 };
+
+// Janela de supressão: não recria o mesmo alerta para o mesmo componente
+// dentro deste intervalo (em ms). Evita spam quando a condição persiste por
+// vários ticks consecutivos — padrão usado em sistemas de monitoramento reais.
+const ALERT_SUPPRESSION_WINDOW_MS = 5 * 60 * 1000; // 5 minutos
 
 function wobble(base: number, amplitude: number): number {
   return base + (Math.random() - 0.5) * 2 * amplitude;
@@ -57,22 +63,45 @@ export function simulateTick(): void {
   checkAndCreateAlerts(now);
 }
 
+/**
+ * Verifica se já existe alerta recente não-reconhecido para o mesmo componente.
+ * Retorna true se um novo alerta DEVE ser criado (não existe duplicata recente).
+ */
+function shouldCreateAlert(component: string, level: string): boolean {
+  const cutoff = new Date(Date.now() - ALERT_SUPPRESSION_WINDOW_MS).toISOString();
+
+  // Procura alerta do mesmo componente + nível dentro da janela de supressão
+  const existing = getDatabase().prepare(`
+    SELECT id FROM alerts
+    WHERE component = ? AND level = ? AND timestamp >= ?
+    ORDER BY timestamp DESC LIMIT 1
+  `).get(component, level, cutoff);
+
+  return !existing;
+}
+
 function checkAndCreateAlerts(timestamp: string): void {
   const db = getDatabase();
-  const alert = (level: string, message: string, component: string) =>
-    db.prepare(`INSERT INTO alerts (id, level, message, component, timestamp, acknowledged) VALUES (?, ?, ?, ?, ?, 0)`)
-      .run(uuid(), level, message, component, timestamp);
+
+  // Função interna: cria alerta somente se passar pelo filtro de deduplicação
+  const tryCreateAlert = (level: string, message: string, component: string) => {
+    if (!shouldCreateAlert(component, level)) return;
+    db.prepare(
+      `INSERT INTO alerts (id, level, message, component, timestamp, acknowledged)
+       VALUES (?, ?, ?, ?, ?, 0)`
+    ).run(uuid(), level, message, component, timestamp);
+  };
 
   if (temperature >= THRESHOLDS.tempCritical)
-    alert("CRITICAL", `Temperatura crítica: ${temperature.toFixed(1)}°C`, "Sensor T-01");
+    tryCreateAlert("CRITICAL", `Temperatura crítica: ${temperature.toFixed(1)}°C`, "Sensor T-01");
   else if (temperature >= THRESHOLDS.tempWarning)
-    alert("WARNING", `Temperatura elevada: ${temperature.toFixed(1)}°C`, "Sensor T-01");
+    tryCreateAlert("WARNING", `Temperatura elevada: ${temperature.toFixed(1)}°C`, "Sensor T-01");
 
   if (currentState === "RUNNING" && rpm < THRESHOLDS.rpmMin)
-    alert("WARNING", `RPM abaixo do mínimo: ${rpm.toFixed(0)} RPM`, "Motor M-01");
+    tryCreateAlert("WARNING", `RPM abaixo do mínimo: ${rpm.toFixed(0)} RPM`, "Motor M-01");
 
   if (currentState === "ERROR")
-    alert("CRITICAL", "Máquina entrou em estado de ERRO.", "Sistema de Controle");
+    tryCreateAlert("CRITICAL", "Máquina entrou em estado de ERRO.", "Sistema de Controle");
 }
 
 export function getLatestStatus() {
@@ -83,7 +112,7 @@ export function getLatestStatus() {
 
 export function startSimulator(): void {
   if (simulatorInterval) return;
-  console.log("🔄 Simulador iniciado — atualizando a cada 3 segundos");
+  console.log("Simulador iniciado — atualizando a cada 3 segundos");
   simulateTick();
   simulatorInterval = setInterval(simulateTick, 3000);
 }

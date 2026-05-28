@@ -26,12 +26,18 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <Header isConnected={isConnected} />
+      {/* Header recebe lastUpdate para exibir há quanto tempo veio a última leitura.
+          Em dashboard industrial isso é crítico: se a tela travar sem mostrar,
+          o operador toma decisões com base em dado obsoleto. */}
+      <Header isConnected={isConnected} lastUpdate={status?.timestamp ?? null} />
 
       <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
-        {/* ---- Linha 1: Cards de métricas ---- */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* ---- Linha 1: Cards de métricas ----
+            Mobile: 1 coluna (cards empilhados, fáceis de ler)
+            Tablet: 2 colunas
+            Desktop: 4 colunas lado a lado */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MachineStateCard
             state={status?.state ?? "STOPPED"}
             isLoading={isLoading}

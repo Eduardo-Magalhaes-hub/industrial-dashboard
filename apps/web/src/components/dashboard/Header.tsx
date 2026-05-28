@@ -1,14 +1,17 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Moon, Sun, Settings, Wifi, WifiOff, Factory } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/cn";
 
 interface HeaderProps {
   isConnected: boolean;
+  /** Timestamp da última leitura recebida da API. null = ainda carregando. */
+  lastUpdate?: Date | null;
 }
 
-export function Header({ isConnected }: HeaderProps) {
+export function Header({ isConnected, lastUpdate }: HeaderProps) {
   const { theme, toggle } = useTheme();
 
   return (
@@ -32,6 +35,12 @@ export function Header({ isConnected }: HeaderProps) {
 
         {/* Controles direita */}
         <div className="flex items-center gap-2 sm:gap-3">
+
+          {/* Timestamp da última atualização — só aparece em telas md+ para
+              não poluir o header no mobile */}
+          {lastUpdate && (
+            <LastUpdateIndicator timestamp={lastUpdate} isConnected={isConnected} />
+          )}
 
           {/* Indicador de conexão */}
           <div className={cn(
@@ -68,5 +77,47 @@ export function Header({ isConnected }: HeaderProps) {
         </div>
       </div>
     </header>
+  );
+}
+
+/**
+ * Mostra "há Xs" desde a última atualização e atualiza a contagem
+ * a cada segundo. Fica vermelho se passou de 15s sem dados novos
+ * (indício de que algo está errado mesmo com isConnected=true).
+ */
+function LastUpdateIndicator({
+  timestamp,
+  isConnected,
+}: {
+  timestamp: Date;
+  isConnected: boolean;
+}) {
+  // Tick interno: força re-render a cada segundo para a contagem avançar.
+  // Sem isso o componente só atualizaria quando `timestamp` mudasse (a cada 3s).
+  const [, forceTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => forceTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const secondsAgo = Math.floor((Date.now() - timestamp.getTime()) / 1000);
+  const isStale = secondsAgo > 15; // mais de 15s sem update = dado obsoleto
+
+  // Em mobile escondemos para economizar espaço (hidden md:flex)
+  return (
+    <div
+      className={cn(
+        "hidden md:flex items-center text-xs font-medium tabular-nums px-2",
+        isStale || !isConnected
+          ? "text-red-600 dark:text-red-400"
+          : "text-slate-500 dark:text-slate-400"
+      )}
+      title={`Última leitura: ${timestamp.toLocaleTimeString("pt-BR")}`}
+    >
+      {secondsAgo < 60
+        ? `Atualizado há ${secondsAgo}s`
+        : `Atualizado há ${Math.floor(secondsAgo / 60)}min`}
+    </div>
   );
 }

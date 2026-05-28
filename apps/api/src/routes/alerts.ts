@@ -1,8 +1,8 @@
-import { Router } from "express";
+import { Router, type Router as ExpressRouter } from "express";
 import { v4 as uuid } from "uuid";
 import { getDatabase } from "../database/schema";
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 router.get("/", (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 20, 100);

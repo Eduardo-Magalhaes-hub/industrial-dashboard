@@ -1,8 +1,8 @@
-import { Router } from "express";
+import { Router, type Router as ExpressRouter } from "express";
 import { getDatabase } from "../database/schema";
 import { getLatestStatus } from "../services/simulator";
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 router.get("/latest", (_req, res) => {
   const row = getLatestStatus() as any;
