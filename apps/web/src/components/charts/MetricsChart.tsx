@@ -7,18 +7,38 @@
  * Recharts foi escolhido por ser declarativo, funcionar bem com React e
  * ter suporte nativo a responsividade via ResponsiveContainer.
  */
+import { useMemo } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import type { MetricHistory } from "@industrial/types";
+import { DEFAULT_THRESHOLDS } from "@industrial/types";
 import { formatTime } from "@/lib/formatters";
 
 interface MetricsChartProps {
   data: MetricHistory[];
 }
 
+// Limites de temperatura para as linhas de referência do gráfico.
+// Vêm da mesma fonte usada por cards e simulador, mantendo tudo sincronizado.
+const TEMP = DEFAULT_THRESHOLDS.temperature;
+
 export function MetricsChart({ data }: MetricsChartProps) {
+  // useMemo evita reprocessar todos os pontos a cada render do componente.
+  // Só recalcula quando `data` muda (a cada novo polling), não em re-renders
+  // disparados por outros estados do pai.
+  const chartData = useMemo(
+    () =>
+      data.map((point) => ({
+        time: formatTime(new Date(point.timestamp)),
+        temperature: +point.temperature.toFixed(1),
+        rpm: +Number(point.rpm).toFixed(0),
+        efficiency: +point.efficiency.toFixed(1),
+      })),
+    [data]
+  );
+
   if (data.length === 0) {
     return (
       <div className="h-64 flex items-center justify-center text-sm text-slate-400">
@@ -26,14 +46,6 @@ export function MetricsChart({ data }: MetricsChartProps) {
       </div>
     );
   }
-
-  // Formata os dados para o Recharts (timestamp → string legível)
-  const chartData = data.map((point) => ({
-    time: formatTime(new Date(point.timestamp)),
-    temperature: +point.temperature.toFixed(1),
-    rpm: +Number(point.rpm).toFixed(0),
-    efficiency: +point.efficiency.toFixed(1),
-  }));
 
   return (
     <ResponsiveContainer width="100%" height={280}>
@@ -49,11 +61,12 @@ export function MetricsChart({ data }: MetricsChartProps) {
           interval={Math.floor(chartData.length / 6)}
         />
 
-        {/* Eixo esquerdo: temperatura (°C) */}
+        {/* Eixo esquerdo: temperatura (°C). Topo do eixo um pouco acima do
+            máximo operacional (85°C) para dar respiro visual às linhas. */}
         <YAxis
           yAxisId="temp"
           orientation="left"
-          domain={[30, 100]}
+          domain={[30, 90]}
           tick={{ fontSize: 11, fill: "currentColor" }}
           tickLine={false}
           className="text-slate-400"
@@ -88,11 +101,12 @@ export function MetricsChart({ data }: MetricsChartProps) {
 
         <Legend wrapperStyle={{ fontSize: "12px" }} />
 
-        {/* Linha de limite de temperatura crítica */}
-        <ReferenceLine yAxisId="temp" y={88} stroke="#ef4444" strokeDasharray="4 4"
-          label={{ value: "Crítico 88°C", fontSize: 10, fill: "#ef4444", position: "insideTopRight" }} />
-        <ReferenceLine yAxisId="temp" y={80} stroke="#f59e0b" strokeDasharray="4 4"
-          label={{ value: "Aviso 80°C", fontSize: 10, fill: "#f59e0b", position: "insideTopRight" }} />
+        {/* Linhas de limite — valores vêm de DEFAULT_THRESHOLDS, então
+            mudam junto com cards e simulador se o limite for ajustado. */}
+        <ReferenceLine yAxisId="temp" y={TEMP.critical} stroke="#ef4444" strokeDasharray="4 4"
+          label={{ value: `Crítico ${TEMP.critical}°C`, fontSize: 10, fill: "#ef4444", position: "insideTopRight" }} />
+        <ReferenceLine yAxisId="temp" y={TEMP.warning} stroke="#f59e0b" strokeDasharray="4 4"
+          label={{ value: `Aviso ${TEMP.warning}°C`, fontSize: 10, fill: "#f59e0b", position: "insideTopRight" }} />
 
         {/* Linhas de dados */}
         <Line

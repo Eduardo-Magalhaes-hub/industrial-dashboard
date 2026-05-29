@@ -1,6 +1,7 @@
 /**
  * Testes do componente MetricCard.
- * Verifica renderização correta para diferentes estados de alerta.
+ * Verifica renderização correta para diferentes estados de alerta,
+ * incluindo lógica de thresholds e modo invertido (ex: RPM mínimo).
  */
 import { render, screen } from "@testing-library/react";
 import { Thermometer } from "lucide-react";
@@ -46,5 +47,44 @@ describe("MetricCard", () => {
   it("deve exibir o máximo quando max é fornecido", () => {
     render(<MetricCard {...defaultProps} />);
     expect(screen.getByText("Máx: 95°C")).toBeInTheDocument();
+  });
+
+  // ---- Novos testes: comportamento de thresholds ----
+
+  it("deve aplicar cor crítica (red border) quando valor passa do criticalThreshold", () => {
+    const { container } = render(
+      <MetricCard {...defaultProps} value={90} />
+    );
+    // 90 > criticalThreshold (88) → borda esquerda vermelha
+    const card = container.firstChild as HTMLElement;
+    expect(card.className).toContain("border-l-red-500");
+  });
+
+  it("deve aplicar cor warning (amber border) entre warning e critical", () => {
+    const { container } = render(
+      <MetricCard {...defaultProps} value={82} />
+    );
+    // 82 >= warning (80) mas < critical (88) → borda âmbar, não vermelha
+    const card = container.firstChild as HTMLElement;
+    expect(card.className).toContain("border-l-amber-500");
+    expect(card.className).not.toContain("border-l-red-500");
+  });
+
+  it("deve aplicar warning quando valor está ABAIXO do threshold com invertThreshold", () => {
+    // invertThreshold é usado para métricas onde valores BAIXOS são ruins (ex: RPM mínimo)
+    const { container } = render(
+      <MetricCard
+        title="RPM"
+        value={850}
+        unit="RPM"
+        icon={<Thermometer />}
+        max={1500}
+        warningThreshold={900}
+        invertThreshold
+      />
+    );
+    // 850 < 900 → deve disparar warning (borda âmbar)
+    const card = container.firstChild as HTMLElement;
+    expect(card.className).toContain("border-l-amber-500");
   });
 });

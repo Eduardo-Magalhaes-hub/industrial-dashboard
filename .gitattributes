@@ -1,0 +1,4 @@
+# Normaliza fim de linha: o Git armazena como LF no repositório
+# e converte para o padrão do SO ao fazer checkout.
+# Silencia os avisos "LF will be replaced by CRLF".
+* text=auto eol=lf

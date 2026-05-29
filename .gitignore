@@ -1,9 +1,21 @@
+# Dependências
 node_modules
+
+# Build / cache
 .turbo
 dist
 .next
 coverage
+*.tsbuildinfo
+
+# SQLite database (gerado em runtime pelo seed/simulador — nunca versionar)
 *.db
+*.db-shm
+*.db-wal
+
+# Variáveis de ambiente
 .env
 .env.local
+
+# Sistema operacional
 .DS_Store

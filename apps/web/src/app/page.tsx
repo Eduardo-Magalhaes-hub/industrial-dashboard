@@ -14,7 +14,14 @@ import { useMachineStatus } from "@/hooks/useMachineStatus";
 import { useAlerts } from "@/hooks/useAlerts";
 import { useMetricHistory } from "@/hooks/useMetricHistory";
 import { formatUptime } from "@/lib/formatters";
+import { DEFAULT_THRESHOLDS } from "@industrial/types";
 import { Thermometer, Gauge, Clock, Activity } from "lucide-react";
+
+// Limites operacionais centralizados em @industrial/types.
+// Os cards usam estes valores para máximo, faixas de aviso e crítico —
+// nenhum número de limite fica hardcoded no componente.
+const TEMP = DEFAULT_THRESHOLDS.temperature;
+const RPM = DEFAULT_THRESHOLDS.rpm;
 
 export default function DashboardPage() {
   const { status, isConnected, isLoading } = useMachineStatus();
@@ -26,12 +33,18 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <Header isConnected={isConnected} />
+      {/* Header recebe lastUpdate para exibir há quanto tempo veio a última leitura.
+          Em dashboard industrial isso é crítico: se a tela travar sem mostrar,
+          o operador toma decisões com base em dado obsoleto. */}
+      <Header isConnected={isConnected} lastUpdate={status?.timestamp ?? null} />
 
       <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
-        {/* ---- Linha 1: Cards de métricas ---- */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* ---- Linha 1: Cards de métricas ----
+            Mobile: 1 coluna (cards empilhados, fáceis de ler)
+            Tablet: 2 colunas
+            Desktop: 4 colunas lado a lado */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MachineStateCard
             state={status?.state ?? "STOPPED"}
             isLoading={isLoading}
@@ -41,9 +54,9 @@ export default function DashboardPage() {
             value={metrics?.temperature ?? 0}
             unit="°C"
             icon={<Thermometer className="w-5 h-5" />}
-            max={95}
-            warningThreshold={80}
-            criticalThreshold={88}
+            max={TEMP.max}
+            warningThreshold={TEMP.warning}
+            criticalThreshold={TEMP.critical}
             isLoading={isLoading}
           />
           <MetricCard
@@ -51,8 +64,8 @@ export default function DashboardPage() {
             value={metrics?.rpm ?? 0}
             unit="RPM"
             icon={<Gauge className="w-5 h-5" />}
-            max={1500}
-            warningThreshold={900}
+            max={RPM.max}
+            warningThreshold={RPM.min}
             isLoading={isLoading}
             invertThreshold // abaixo do warning é ruim
           />
